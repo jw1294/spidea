@@ -12,7 +12,7 @@ import numpy as np
 import scipy as sp
 import scipy.sparse as sps
 import scipy.sparse.linalg as spsla
-from . import results as rs
+import results as rs
 
 
 def construct_K(pm):
@@ -61,13 +61,13 @@ def construct_V(pm, td):
     returns sparse_matrix
         Potential energy matrix
     """
-    x = np.linspace(-pm.sys.xmax,pm.sys.xmax,pm.sys.grid)
+    x = np.linspace(-pm.sys.xmax, pm.sys.xmax, pm.sys.grid)
     V_diagonal = np.empty(pm.sys.grid)
-    if td == 0:
+    if td == False:
         V_diagonal = pm.sys.v_ext(x)
-    else:
+    if td == True:
         V_diagonal = pm.sys.v_ext(x) + pm.sys.v_pert(x)
-    V = sps.diags(V_diagonal, 0, pm.sys.grid, pm.sys.grid, format='csr')
+    V = sps.diags(V_diagonal, 0, (pm.sys.grid, pm.sys.grid), format='csr')
     return V
 
 
@@ -93,9 +93,9 @@ def construct_A(pm, H, td):
         Sparse matrix A
     """
     I = sps.identity(pm.sys.grid)
-    if(td == 0):
+    if td == False:
         A = I + 1.0*(pm.ext.ideltat/2.0)*H
-    if(td == 1):
+    if td == True:
         A = I + 1.0j*(pm.sys.deltat/2.0)*H
     return A
 
@@ -121,9 +121,9 @@ def construct_C(pm, H, td):
         Sparse matrix C
     """
     I = sps.identity(pm.sys.grid)
-    if(td == 0):
+    if td == False:
         C = I - 1.0*(pm.ext.ideltat/2.0)*H
-    if(td == 1):
+    if td == True:
         C = I - 1.0j*(pm.sys.deltat/2.0)*H
     return C
 
@@ -189,23 +189,21 @@ def initial_wavefunction(pm, x):
     returns array_like
        Initial guess for wavefunction
     """
-    initial = n (1.0 / np.sqrt(2.0*np.pi)) * np.exp(-0.5*x**2)
+    initial = (1.0 / np.sqrt(2.0*np.pi)) * np.exp(-0.5*x**2)
     return initial
 
 
-def main(parameters):
+def main(pm):
     r"""Performs calculation of the one-electron system
 
     parameters
     ----------
-    parameters : object
+    pm : object
         Parameters object
 
     returns object
         Results object
     """
-    pm = parameters
-
     # construct the grid
     x = np.linspace(-pm.sys.xmax, pm.sys.xmax, pm.sys.grid)
 
@@ -213,7 +211,7 @@ def main(parameters):
     K = construct_K(pm)
 
     # construct the potential energy matrix
-    V = construct_V(pm, 0)
+    V = construct_V(pm, False)
 
     # construct the Hamiltonian matrix, and the matrices used in the Crank-Nicholson propagation
     H = K + V
@@ -224,8 +222,8 @@ def main(parameters):
     wavefunction = initial_wavefunction(pm, x)
 
     # perform complex time iterations until converged
-    i = 1
-    while(i < pm.ext.iimax):
+    iteration = 0
+    while(iteration < pm.ext.iimax):
 
         # construct the vector b
         b = C*wavefunction
@@ -237,25 +235,25 @@ def main(parameters):
         wavefunction, info = spsla.cg(A, b, x0=wavefunction, tol=pm.ext.itol_solver)
 
         # normalise the wavefunction
-        wavefunction = wavefunction/(np.linalg.norm(wavefunction)*pm.sys.deltax**0.5)
+        wavefunction = wavefunction / (np.linalg.norm(wavefunction)*pm.sys.deltax**0.5)
 
         # calculate the convergence of the wavefunction
         wavefunction_convergence = np.linalg.norm(wavefunction_old-wavefunction)
-        string = 'imaginary time, t = {}, convergence = {}'\
-                    .format(i*pm.ext.ideltat, wavefunction_convergence)
+        string = 'imaginary time, t = {0:.2f}, convergence = {1}'.format(iteration*pm.ext.ideltat, wavefunction_convergence)
         pm.sprint(string, 1, newline=False)
         if(wavefunction_convergence < pm.ext.itol):
-            i = pm.ext.iimax
+            iteration = pm.ext.iimax
+            pm.sprint('\n', 1, newline=False)
             string = 'ground-state converged'
             pm.sprint(string, 1, newline=True)
 
         # iterate
-        i += 1
+        iteration += 1
 
-    # Calculate the density
+    # calculate the density
     density = calculate_density(pm, wavefunction)
 
-    # Calculate the ground-state energy
+    # calculate the ground-state energy
     energy = calculate_energy(pm, H, wavefunction)
     print('ground-state energy =', energy)
 
@@ -264,14 +262,14 @@ def main(parameters):
     results.add(density, 'gs_ext_den')
     results.add(energy, 'gs_ext_E')
     results.add(np.diag(V.toarray()), 'gs_ext_vxt')
-    if (pm.run.save):
+    if pm.run.save:
         results.save(pm)
 
     # Propagate through real time
     if(pm.run.time_dependence == True):
 
         # Construct the potential energy matrix
-        V = construct_V(pm, 1)
+        V = construct_V(pm, True)
 
         # Construct the Hamiltonian matrix, and the matrices used in the
         # Crank-Nicholson propagation.
@@ -293,30 +291,22 @@ def main(parameters):
             b = C*wavefunction
 
             # Solve Ax=b
-            wavefunction, info = spsla.cg(A,b,x0=wavefunction,
-                                 tol=pm.ext.rtol_solver)
+            wavefunction, info = spsla.cg(A, b, x0=wavefunction, tol=pm.ext.rtol_solver)
 
             # Calculate the density
             densities[i,:] = calculate_density(pm, wavefunction)
 
             # Calculate the norm of the wavefunction
             normalisation = (np.linalg.norm(wavefunction)*pm.sys.deltax**0.5)
-            string = 'EXT: real time, t = {}, normalisation = {}'\
-                      .format(i*pm.sys.deltat, normalisation)
+            string = 'EXT: real time, t = {}, normalisation = {}'.format(i*pm.sys.deltat, normalisation)
             pm.sprint(string, 1, newline=False)
 
-        # Calculate the current density
-        current_density = calculate_current_density(pm, densities)
-
         # Save the time-dependent density, current density and external potential
-        if(pm.run.time_dependence == True):
+        if pm.run.time_dependence == True:
              results.add(densities,'td_ext_den')
              results.add(current_density,'td_ext_cur')
-             results.add(V,'td_ext_vxt')
+             results.add(np.diag(V.toarray()), 'td_ext_vxt')
              if (pm.run.save):
                  results.save(pm)
-
-    # Program complete
-    os.system('rm *.pyc')
 
     return results

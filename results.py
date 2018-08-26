@@ -1,9 +1,10 @@
 """Bundles and saves iDEA results
 
 """
+import copy as cp
 import numpy as np
 import pickle
-import copy as cp
+
 
 class Results(object):
     """Container for results.
@@ -27,19 +28,19 @@ class Results(object):
         'td': 'time-dependent',
         'gs': 'ground state',
     }
-
     method_dict = {
         'ext': 'exact',
     }
-
     quantity_dict = {
         'den': r'$\rho$',
         'vxt': r'$V_{ext}$',
         'tden' : r'$\rho$',
     }
 
+
     def __init__(self):
         self._saved = set()  # list of results already saved to disk
+
 
     @property
     def _not_saved(self):
@@ -56,8 +57,8 @@ class Results(object):
         """
         c, m, q = shortname.split('_')
         s  = r"{} {} ({})".format(Results.calc_dict[c], Results.quantity_dict[q], Results.method_dict[m])
-
         return s
+
 
     def add(self, results, name):
         """Add results to the container.
@@ -68,7 +69,6 @@ class Results(object):
         # ask to save again
         if hasattr(self, name) and name in self._saved:
             self._saved.remove(name)
-
         # if name exists and we are adding another Results instance,
         # copy its attributes
         if hasattr(self, name) and isinstance(results, Results):
@@ -76,6 +76,7 @@ class Results(object):
         # else, we simply deepcopy the results
         else:
             setattr(self, name, cp.deepcopy(results))
+
 
     @staticmethod
     def read(name, pm, dir=None):
@@ -95,15 +96,14 @@ class Results(object):
         """
         if dir is None:
             dir = pm.output_dir + '/raw'
-
         filename = "{}/{}.db".format(dir,name)
         pm.sprint("Reading {} from {}".format(name,filename),0)
         #pm.sprint("Reading {} from {}".format(Results.label(name),filename),0)
         f = open(filename, 'rb')
         data = pickle.load(f, encoding='latin1')
         f.close()
-
         return data
+
 
     def add_pickled_data(self, name, pm, dir=None):
         """Read results from pickle file and adds to results.

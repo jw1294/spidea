@@ -9,7 +9,7 @@ import os
 import sys
 import pickle
 import numpy as np
-import iDEA.plot
+import plot
 
 def main():
 
@@ -24,7 +24,7 @@ def main():
     print('                *     *    ****     *****     ****              ')
     print('                                                                ')
     print('  +------------------------------------------------------------+')
-    print('  |                    Visualise iDEA Outputs                  |')
+    print('  |                    Visualise SPiDEA Outputs                |')
     print('  |                                                            |')
     print('  |                   Created by Jack Wetherell                |')
     print('  |                    The University of York                  |')
@@ -33,17 +33,7 @@ def main():
 
     # import parameters file
     print('loading in parameters file...')
-    pickle_file = "parameters.p"
-    python_file = "parameters.py"
-    if os.path.isfile(pickle_file):
-        f = open(pickle_file,'rb')
-        pm = pickle.load(f)
-        f.close()
-    elif os.path.isfile(python_file):
-        sys.path.insert(0,os.getcwd())
-        import parameters as pm
-    else:
-        raise IOError("Neither {} nor {} found.".format(pickle_file, python_file))
+    import parameters as pm
 
     # gather file information from user
     file_names = str(input('enter file names to process (space seperated): ')).split(' ')
@@ -54,7 +44,7 @@ def main():
     data = []
     for fn in file_names:
         print('reading {}...'.format(fn))
-        data.append(iDEA.plot.read_quantity(pm, fn))
+        data.append(plot.read_quantity(pm, fn))
     # ensure data is all the same shape
     for i in range(0, len(data)):
         for j in range(0, len(data)):
@@ -70,7 +60,7 @@ def main():
     # determine what the user wants to be processed
     save_data = bool(eval(input('save to data file (0=no,1=yes): ')))
     save_plot = bool(eval(input('save to pdf image (0=no,1=yes): ')))
-    if td or dim==3:
+    if td:
         if save_data or save_plot:
             timestep = int(eval(input('timestep to save: ')))
         save_anim = bool(eval(input('save to mp4 video (0=no,1=yes): ')))
@@ -82,18 +72,18 @@ def main():
 
     # process data in specified way
     print('processing raw data:')
-    if td or dim==3:
+    if td:
         if save_data:
-            iDEA.plot.to_data(pm, file_names, data, td, dim, file_name=file_name, timestep=timestep)
+            plot.to_data(pm, file_names, data, td, dim, file_name=file_name, timestep=timestep)
         if save_plot:
-            iDEA.plot.to_plot(pm, file_names, data, td, dim, file_name=file_name, timestep=timestep)
+            plot.to_plot(pm, file_names, data, td, dim, file_name=file_name, timestep=timestep)
         if save_anim:
-            iDEA.plot.to_anim(pm, file_names, data, td, dim, file_name=file_name, step=step)
+            plot.to_anim(pm, file_names, data, td, dim, file_name=file_name, step=step)
     else:
         if save_data:
-            iDEA.plot.to_data(pm, file_names, data, td, dim, file_name=file_name)
+            plot.to_data(pm, file_names, data, td, dim, file_name=file_name)
         if save_plot:
-            iDEA.plot.to_plot(pm, file_names, data, td, dim, file_name=file_name)
+            plot.to_plot(pm, file_names, data, td, dim, file_name=file_name)
 
     # finish
     print('all jobs done')
